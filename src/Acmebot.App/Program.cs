@@ -4,6 +4,7 @@ using Acmebot.App.Acme;
 using Acmebot.App.Extensions;
 using Acmebot.App.Infrastructure;
 using Acmebot.App.Notifications;
+using Azure.Storage.Blobs;
 using Acmebot.App.Options;
 using Acmebot.App.Providers;
 
@@ -147,6 +148,15 @@ builder.Services.AddSingleton<IEnumerable<IDnsProvider>>(provider =>
     }
 
     return dnsProviders;
+});
+
+builder.Services.AddSingleton(provider =>
+{
+    var connectionString = builder.Configuration["AzureWebJobsStorage"]
+        ?? throw new InvalidOperationException("AzureWebJobsStorage is not configured.");
+    var containerClient = new BlobContainerClient(connectionString, "acmebot");
+    containerClient.CreateIfNotExists();
+    return containerClient;
 });
 
 builder.Build().Run();
