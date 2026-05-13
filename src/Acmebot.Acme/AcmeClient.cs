@@ -252,8 +252,6 @@ public sealed class AcmeClient : IDisposable
             SerializeUtf8(request),
             cancellationToken).ConfigureAwait(false);
 
-             // DEBUG - diese Zeile einfügen:
-        throw new InvalidOperationException($"ZEROSSL ORDER RESPONSE: {System.Text.Encoding.UTF8.GetString(response.Body.Span)}");
 
         return CreateResult(response, DeserializeUtf8<AcmeOrderResource>(response.Body));
     }
@@ -871,6 +869,11 @@ public sealed class AcmeClient : IDisposable
     private static AcmeProtocolException CreateProtocolException(AcmeRawResponse rawResponse, Uri requestUrl)
     {
         var problem = TryDeserializeUtf8<AcmeProblemDetails>(rawResponse.Body);
+
+            // DEBUG
+        var bodyText = System.Text.Encoding.UTF8.GetString(rawResponse.Body.Span);
+        throw new InvalidOperationException($"ZEROSSL ERROR RESPONSE [{(int)rawResponse.StatusCode}] to {requestUrl}: {bodyText}");
+
 
         return new AcmeProtocolException(
             rawResponse.StatusCode,
