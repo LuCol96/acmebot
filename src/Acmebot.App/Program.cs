@@ -1,10 +1,9 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 
 using Acmebot.App.Acme;
 using Acmebot.App.Extensions;
 using Acmebot.App.Infrastructure;
 using Acmebot.App.Notifications;
-using Azure.Storage.Blobs;
 using Acmebot.App.Options;
 using Acmebot.App.Providers;
 
@@ -13,6 +12,7 @@ using Azure.Functions.Worker.Extensions.HttpApi.Config;
 using Azure.Identity;
 using Azure.Monitor.OpenTelemetry.Exporter;
 using Azure.Security.KeyVault.Certificates;
+using Azure.Storage.Blobs;
 
 using DnsClient;
 
