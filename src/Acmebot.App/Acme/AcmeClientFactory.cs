@@ -27,7 +27,6 @@ public class AcmeClientFactory(IOptions<AcmebotOptions> options, BlobContainerCl
         var account = await LoadStateAsync<AccountDetails>("account.json");
         var accountKey = await LoadStateAsync<AccountKey>("account_key.json");
         var contacts = GetContacts();
-        var isNewAccountKey = false;
 
         if (accountKey is null)
         {
@@ -37,7 +36,7 @@ public class AcmeClientFactory(IOptions<AcmebotOptions> options, BlobContainerCl
             }
 
             accountKey = AccountKey.CreateDefault();
-            isNewAccountKey = true;
+            await SaveStateAsync(accountKey, "account_key.json");
         }
 
         var signer = accountKey.GenerateSigner();
@@ -71,10 +70,6 @@ public class AcmeClientFactory(IOptions<AcmebotOptions> options, BlobContainerCl
 
             await SaveStateAsync(account, "account.json");
 
-            if (isNewAccountKey)
-            {
-                await SaveStateAsync(accountKey, "account_key.json");
-            }
         }
         else
         {
