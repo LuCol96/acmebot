@@ -102,15 +102,19 @@ public sealed record AcmeNewOrderRequest
     public required IReadOnlyList<AcmeIdentifier> Identifiers { get; init; }
 
     [JsonPropertyName("notBefore")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public DateTimeOffset? NotBefore { get; init; }
 
     [JsonPropertyName("notAfter")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public DateTimeOffset? NotAfter { get; init; }
 
     [JsonPropertyName("replaces")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Replaces { get; init; }
 
     [JsonPropertyName("profile")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Profile { get; init; }
 }
 
