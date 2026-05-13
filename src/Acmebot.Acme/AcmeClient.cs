@@ -870,11 +870,6 @@ public sealed class AcmeClient : IDisposable
     {
         var problem = TryDeserializeUtf8<AcmeProblemDetails>(rawResponse.Body);
 
-            // DEBUG
-        var bodyText = System.Text.Encoding.UTF8.GetString(rawResponse.Body.Span);
-        throw new InvalidOperationException($"ZEROSSL ERROR RESPONSE [{(int)rawResponse.StatusCode}] to {requestUrl}: {bodyText}");
-
-
         return new AcmeProtocolException(
             rawResponse.StatusCode,
             problem?.Detail ?? $"The ACME server returned {(int)rawResponse.StatusCode} ({rawResponse.StatusCode}).",
