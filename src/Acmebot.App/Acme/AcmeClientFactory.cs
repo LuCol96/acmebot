@@ -142,8 +142,14 @@ public class AcmeClientFactory(IOptions<AcmebotOptions> options, BlobContainerCl
         var blobName = ResolveBlobName(path);
         var blobClient = blobContainerClient.GetBlobClient(blobName);
         var json = JsonSerializer.Serialize(value, s_jsonSerializerOptions);
-
-        await blobClient.UploadAsync(BinaryData.FromString(json), overwrite: true);
+        try
+        {
+            await blobClient.UploadAsync(BinaryData.FromString(json), overwrite: true);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to save state to blob '{blobName}': {ex.Message}", ex);
+        }
     }
 
     private string ResolveBlobName(string path) => $".acmebot/{_options.Endpoint.Host}/{path}";
