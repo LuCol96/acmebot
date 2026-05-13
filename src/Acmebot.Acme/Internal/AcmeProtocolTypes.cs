@@ -43,18 +43,23 @@ internal sealed record AcmeJsonWebKey
     public required string KeyType { get; init; }
 
     [JsonPropertyName("crv")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Curve { get; init; }
 
     [JsonPropertyName("x")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? X { get; init; }
 
     [JsonPropertyName("y")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Y { get; init; }
 
     [JsonPropertyName("n")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Modulus { get; init; }
 
     [JsonPropertyName("e")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Exponent { get; init; }
 
     public string ToThumbprintJson()
