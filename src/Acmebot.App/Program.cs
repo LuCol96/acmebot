@@ -156,6 +156,11 @@ builder.Services.AddSingleton(provider =>
         ?? throw new InvalidOperationException("AzureWebJobsStorage is not configured.");
     var containerClient = new BlobContainerClient(connectionString, "acmebot");
     containerClient.CreateIfNotExists();
+    
+    // Debug: explizit testen ob Schreiben funktioniert
+    var testBlob = containerClient.GetBlobClient("_test/write-test.txt");
+    testBlob.Upload(BinaryData.FromString("test"), overwrite: true);
+    
     return containerClient;
 });
 
