@@ -1,15 +1,18 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 
 using Acmebot.Acme;
 using Acmebot.Acme.Models;
 using Acmebot.App.Infrastructure;
 using Acmebot.App.Options;
 
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
+
 using Microsoft.Extensions.Options;
 
 namespace Acmebot.App.Acme;
 
-public class AcmeClientFactory(IOptions<AcmebotOptions> options)
+public class AcmeClientFactory(IOptions<AcmebotOptions> options, BlobContainerClient blobContainerClient)
 {
     private readonly AcmebotOptions _options = options.Value;
 
@@ -21,8 +24,8 @@ public class AcmeClientFactory(IOptions<AcmebotOptions> options)
 
     public async Task<AcmeClientContext> CreateClientAsync()
     {
-        var account = LoadState<AccountDetails>("account.json");
-        var accountKey = LoadState<AccountKey>("account_key.json");
+        var account = await LoadStateAsync<AccountDetails>("account.json");
+        var accountKey = await LoadStateAsync<AccountKey>("account_key.json");
         var contacts = GetContacts();
         var isNewAccountKey = false;
 
@@ -66,11 +69,11 @@ public class AcmeClientFactory(IOptions<AcmebotOptions> options)
                 externalAccountBinding);
             account = AccountDetails.FromAccountHandle(accountHandle, directory.Metadata?.TermsOfService);
 
-            SaveState(account, "account.json");
+            await SaveStateAsync(account, "account.json");
 
             if (isNewAccountKey)
             {
-                SaveState(accountKey, "account_key.json");
+                await SaveStateAsync(accountKey, "account_key.json");
             }
         }
         else
@@ -88,7 +91,7 @@ public class AcmeClientFactory(IOptions<AcmebotOptions> options)
                 });
             account = AccountDetails.FromAccountHandle(accountHandle, directory.Metadata?.TermsOfService);
 
-            SaveState(account, "account.json");
+            await SaveStateAsync(account, "account.json");
         }
 
         return new AcmeClientContext
@@ -118,34 +121,30 @@ public class AcmeClientFactory(IOptions<AcmebotOptions> options)
     private static bool ContactsEqual(IReadOnlyList<string>? actualContacts, IReadOnlyList<string> expectedContacts)
         => actualContacts is not null && actualContacts.SequenceEqual(expectedContacts, StringComparer.Ordinal);
 
-    private TState? LoadState<TState>(string path)
+    private async Task<TState?> LoadStateAsync<TState>(string path)
     {
-        var fullPath = ResolveStateFullPath(path);
+        var blobName = ResolveBlobName(path);
+        var blobClient = blobContainerClient.GetBlobClient(blobName);
 
-        if (!File.Exists(fullPath))
+        try
+        {
+            BlobDownloadResult result = await blobClient.DownloadContentAsync();
+            return JsonSerializer.Deserialize<TState>(result.Content.ToString(), s_jsonSerializerOptions);
+        }
+        catch (Azure.RequestFailedException ex) when (ex.Status == 404)
         {
             return default;
         }
-
-        var json = File.ReadAllText(fullPath);
-
-        return JsonSerializer.Deserialize<TState>(json, s_jsonSerializerOptions);
     }
 
-    private void SaveState<TState>(TState value, string path)
+    private async Task SaveStateAsync<TState>(TState value, string path)
     {
-        var fullPath = ResolveStateFullPath(path);
-        var directoryPath = Path.GetDirectoryName(fullPath);
-
-        if (!string.IsNullOrEmpty(directoryPath) && !Directory.Exists(directoryPath))
-        {
-            Directory.CreateDirectory(directoryPath);
-        }
-
+        var blobName = ResolveBlobName(path);
+        var blobClient = blobContainerClient.GetBlobClient(blobName);
         var json = JsonSerializer.Serialize(value, s_jsonSerializerOptions);
 
-        File.WriteAllText(fullPath, json);
+        await blobClient.UploadAsync(BinaryData.FromString(json), overwrite: true);
     }
 
-    private string ResolveStateFullPath(string path) => Environment.ExpandEnvironmentVariables($"%HOME%/data/.acmebot/{_options.Endpoint.Host}/{path}");
+    private string ResolveBlobName(string path) => $".acmebot/{_options.Endpoint.Host}/{path}";
 }
