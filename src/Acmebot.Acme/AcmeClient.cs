@@ -111,6 +111,9 @@ public sealed class AcmeClient : IDisposable
             signedPayload,
             cancellationToken).ConfigureAwait(false);
 
+            // DEBUG: Response Body loggen
+            throw new InvalidOperationException($"ZEROSSL ORDER RESPONSE: {System.Text.Encoding.UTF8.GetString(response.Body.Span)}");
+
         var resource = DeserializeUtf8<AcmeAccountResource>(response.Body);
         var location = response.Location ?? throw new AcmeProtocolException(
             response.StatusCode,
