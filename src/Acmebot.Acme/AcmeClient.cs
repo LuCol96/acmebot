@@ -622,7 +622,6 @@ public sealed class AcmeClient : IDisposable
             var nonce = await GetNonceAsync(cancellationToken).ConfigureAwait(false);
             var message = CreateSignedMessage(requestUrl, signer, keyId, payload, nonce);
             var contentBytes = SerializeUtf8(message);
-            throw new InvalidOperationException($"DEBUG REQUEST TO {requestUrl}: {System.Text.Encoding.UTF8.GetString(contentBytes)}");
             using var request = new HttpRequestMessage(HttpMethod.Post, requestUrl);
 
             request.Content = new ByteArrayContent(contentBytes);
