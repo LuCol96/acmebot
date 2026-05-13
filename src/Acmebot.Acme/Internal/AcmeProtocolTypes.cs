@@ -10,15 +10,18 @@ internal sealed record AcmeProtectedHeader
     public required string Algorithm { get; init; }
 
     [JsonPropertyName("nonce")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Nonce { get; init; }
 
     [JsonPropertyName("url")]
     public required string Url { get; init; }
 
     [JsonPropertyName("jwk")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AcmeJsonWebKey? JsonWebKey { get; init; }
 
     [JsonPropertyName("kid")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? KeyIdentifier { get; init; }
 }
 
