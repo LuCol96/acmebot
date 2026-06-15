@@ -13,7 +13,7 @@ internal class AccountKey
     public static AccountKey CreateDefault()
     {
         using var rsa = RSA.Create(2048);
-    
+        
         return new AccountKey
         {
             KeyType = "RS256",
