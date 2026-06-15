@@ -19,7 +19,6 @@ public class AcmeClientFactory(IOptions<AcmebotOptions> options, BlobContainerCl
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         IncludeFields = true
     };
-    
     private readonly AcmebotOptions _options = options.Value;
 
     public async Task<AcmeClientContext> CreateClientAsync()
