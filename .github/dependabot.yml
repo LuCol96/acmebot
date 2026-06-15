@@ -10,7 +10,7 @@ updates:
     schedule:
       interval: "weekly"
     groups:
-      dependencies:
+      nuget:
         patterns:
           - "*"
     ignore:
@@ -23,7 +23,20 @@ updates:
     schedule:
       interval: "weekly"
     groups:
-      dependencies:
+      client-app:
+        patterns:
+          - "*"
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
+
+  - package-ecosystem: "npm"
+    directory: "/docs"
+    schedule:
+      interval: "weekly"
+    groups:
+      docs:
         patterns:
           - "*"
     ignore:
@@ -36,6 +49,6 @@ updates:
     schedule:
       interval: "weekly"
     groups:
-      dependencies:
+      github-actions:
         patterns:
           - "*"

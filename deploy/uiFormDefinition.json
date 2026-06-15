@@ -188,8 +188,8 @@
                   "constraints": {
                     "allowedValues": [
                       {
-                        "label": "Known endpoint (recommended)",
-                        "value": "known"
+                        "label": "Verified endpoint (recommended)",
+                        "value": "verified"
                       },
                       {
                         "label": "Custom",
@@ -201,9 +201,9 @@
                   "visible": true
                 },
                 {
-                  "name": "knownEndpoint",
+                  "name": "verifiedEndpoint",
                   "type": "Microsoft.Common.DropDown",
-                  "label": "Known ACME endpoint",
+                  "label": "Verified ACME endpoint",
                   "placeholder": "ACME endpoint",
                   "defaultValue": "",
                   "multiLine": true,
@@ -212,43 +212,38 @@
                     "allowedValues": [
                       {
                         "label": "Let's Encrypt",
-                        "description": "Let's Encrypt ACME v2 production endpoint for publicly trusted certificates.",
+                        "description": "Let's Encrypt ACME endpoint for publicly trusted certificates.",
                         "value": "https://acme-v02.api.letsencrypt.org/directory"
                       },
                       {
-                        "label": "ZeroSSL",
-                        "description": "ZeroSSL ACME endpoint for 90-day DV certificates. EAB credentials are required.",
-                        "value": "https://acme.zerossl.com/v2/DV90"
+                        "label": "GlobalSign",
+                        "description": "GlobalSign ACME endpoint for publicly trusted certificates.",
+                        "value": "https://emea.acme.atlas.globalsign.com/directory"
                       },
                       {
                         "label": "Google Trust Services",
-                        "description": "Google Trust Services ACME endpoint for public TLS certificates.",
+                        "description": "Google Trust Services ACME endpoint for publicly trusted certificates.",
                         "value": "https://dv.acme-v02.api.pki.goog/directory"
                       },
                       {
-                        "label": "SSL.com (RSA)",
-                        "description": "SSL.com ACME endpoint for DV certificates using RSA certificate keys.",
-                        "value": "https://acme.ssl.com/sslcom-dv-rsa"
-                      },
-                      {
                         "label": "SSL.com (ECC)",
-                        "description": "SSL.com ACME endpoint for DV certificates using ECC certificate keys.",
+                        "description": "SSL.com ACME endpoint for DV certificates using ECC keys.",
                         "value": "https://acme.ssl.com/sslcom-dv-ecc"
                       },
                       {
-                        "label": "Entrust",
-                        "description": "Entrust ACME endpoint for accounts enabled for Entrust certificate automation.",
-                        "value": "https://acme.entrust.net/acme2/directory"
+                        "label": "SSL.com (RSA)",
+                        "description": "SSL.com ACME endpoint for DV certificates using RSA keys.",
+                        "value": "https://acme.ssl.com/sslcom-dv-rsa"
                       },
                       {
-                        "label": "Global Sign",
-                        "description": "GlobalSign Atlas ACME endpoint for accounts enabled for certificate automation.",
-                        "value": "https://emea.acme.atlas.globalsign.com/directory"
+                        "label": "ZeroSSL",
+                        "description": "ZeroSSL ACME endpoint for 90-day DV certificates.",
+                        "value": "https://acme.zerossl.com/v2/DV90"
                       }
                     ],
                     "required": true
                   },
-                  "visible": "[if(equals(steps('acmeStep').endpointSection.endpointType, 'known'), true, false)]"
+                  "visible": "[if(equals(steps('acmeStep').endpointSection.endpointType, 'verified'), true, false)]"
                 },
                 {
                   "name": "customEndpoint",
@@ -301,7 +296,24 @@
                     ],
                     "required": true
                   },
-                  "visible": true
+                  "visible": "[equals(steps('acmeStep').endpointSection.endpointType, 'custom')]"
+                },
+                {
+                  "name": "requiredCredentialType",
+                  "type": "Microsoft.Common.OptionsGroup",
+                  "label": "Credential type",
+                  "toolTip": "This credential type is fixed because the selected certificate authority requires external account binding.",
+                  "defaultValue": "External Account Binding (EAB)",
+                  "constraints": {
+                    "allowedValues": [
+                      {
+                        "label": "External Account Binding (EAB)",
+                        "value": "eab"
+                      }
+                    ],
+                    "required": true
+                  },
+                  "visible": "[and(equals(steps('acmeStep').endpointSection.endpointType, 'verified'), or(equals(coalesce(steps('acmeStep').endpointSection.verifiedEndpoint, ''), 'https://emea.acme.atlas.globalsign.com/directory'), equals(coalesce(steps('acmeStep').endpointSection.verifiedEndpoint, ''), 'https://dv.acme-v02.api.pki.goog/directory'), equals(coalesce(steps('acmeStep').endpointSection.verifiedEndpoint, ''), 'https://acme.ssl.com/sslcom-dv-ecc'), equals(coalesce(steps('acmeStep').endpointSection.verifiedEndpoint, ''), 'https://acme.ssl.com/sslcom-dv-rsa'), equals(coalesce(steps('acmeStep').endpointSection.verifiedEndpoint, ''), 'https://acme.zerossl.com/v2/DV90')))]"
                 }
               ],
               "visible": true
@@ -366,7 +378,7 @@
                   "visible": true
                 }
               ],
-              "visible": "[if(equals(steps('acmeStep').credentialSection.credentialType, 'eab'), true, false)]"
+              "visible": "[or(and(equals(steps('acmeStep').endpointSection.endpointType, 'verified'), or(equals(coalesce(steps('acmeStep').endpointSection.verifiedEndpoint, ''), 'https://emea.acme.atlas.globalsign.com/directory'), equals(coalesce(steps('acmeStep').endpointSection.verifiedEndpoint, ''), 'https://dv.acme-v02.api.pki.goog/directory'), equals(coalesce(steps('acmeStep').endpointSection.verifiedEndpoint, ''), 'https://acme.ssl.com/sslcom-dv-ecc'), equals(coalesce(steps('acmeStep').endpointSection.verifiedEndpoint, ''), 'https://acme.ssl.com/sslcom-dv-rsa'), equals(coalesce(steps('acmeStep').endpointSection.verifiedEndpoint, ''), 'https://acme.zerossl.com/v2/DV90'))), equals(coalesce(steps('acmeStep').credentialSection.credentialType, ''), 'eab'))]"
             }
           ]
         },
@@ -393,7 +405,7 @@
                   },
                   {
                     "label": "Amazon Route 53",
-                    "description": "Use Amazon Route 53 with an AWS access key, secret key, and region.",
+                    "description": "Use Amazon Route 53 with AWS access keys or an IAM role assumed by managed identity.",
                     "value": "Route53"
                   },
                   {
@@ -433,13 +445,23 @@
                   },
                   {
                     "label": "Google Cloud DNS",
-                    "description": "Use Google Cloud DNS with a base64-encoded service account key file.",
+                    "description": "Use Google Cloud DNS with a service account key file or workload identity federation.",
                     "value": "GoogleDns"
                   },
                   {
                     "label": "IONOS DNS",
                     "description": "Use IONOS DNS with an API key.",
                     "value": "IonosDns"
+                  },
+                  {
+                    "label": "OVH",
+                    "description": "Use OVH with an application key, application secret, and consumer key.",
+                    "value": "Ovh"
+                  },
+                  {
+                    "label": "PowerDNS",
+                    "description": "Use a PowerDNS Authoritative server with the HTTP API enabled.",
+                    "value": "PowerDns"
                   },
                   {
                     "label": "Regfish",
@@ -587,6 +609,45 @@
               "label": "Amazon Route 53",
               "elements": [
                 {
+                  "name": "credentialType",
+                  "type": "Microsoft.Common.OptionsGroup",
+                  "label": "Credential type",
+                  "toolTip": "Choose how Acmebot authenticates to Amazon Route 53.",
+                  "defaultValue": "roleArn",
+                  "constraints": {
+                    "allowedValues": [
+                      {
+                        "label": "IAM role with managed identity",
+                        "value": "roleArn"
+                      },
+                      {
+                        "label": "AWS access key",
+                        "value": "accessKey"
+                      }
+                    ],
+                    "required": true
+                  },
+                  "visible": true
+                },
+                {
+                  "name": "roleArn",
+                  "type": "Microsoft.Common.TextBox",
+                  "label": "Role ARN",
+                  "placeholder": "arn:aws:iam::123456789012:role/acmebot-route53",
+                  "defaultValue": "",
+                  "toolTip": "AWS IAM role ARN assumed through STS AssumeRoleWithWebIdentity using the Function App managed identity.",
+                  "constraints": {
+                    "required": true,
+                    "validations": [
+                      {
+                        "regex": "^arn:aws[a-zA-Z-]*:iam::[0-9]{12}:role/.+",
+                        "message": "Enter a valid AWS IAM role ARN."
+                      }
+                    ]
+                  },
+                  "visible": "[if(equals(steps('dnsProviderStep').route53Section.credentialType, 'roleArn'), true, false)]"
+                },
+                {
                   "name": "accessKey",
                   "type": "Microsoft.Common.TextBox",
                   "label": "Access key ID",
@@ -596,7 +657,7 @@
                   "constraints": {
                     "required": true
                   },
-                  "visible": true
+                  "visible": "[if(equals(steps('dnsProviderStep').route53Section.credentialType, 'accessKey'), true, false)]"
                 },
                 {
                   "name": "secretKey",
@@ -612,25 +673,7 @@
                   "options": {
                     "hideConfirmation": true
                   },
-                  "visible": true
-                },
-                {
-                  "name": "region",
-                  "type": "Microsoft.Common.TextBox",
-                  "label": "Region",
-                  "placeholder": "us-east-1",
-                  "defaultValue": "us-east-1",
-                  "toolTip": "AWS region used by the Route 53 client.",
-                  "constraints": {
-                    "required": true,
-                    "validations": [
-                      {
-                        "regex": "^[a-z]{2}-[a-z]+-[0-9]+$",
-                        "message": "Enter a valid AWS region name."
-                      }
-                    ]
-                  },
-                  "visible": true
+                  "visible": "[if(equals(steps('dnsProviderStep').route53Section.credentialType, 'accessKey'), true, false)]"
                 }
               ],
               "visible": "[if(equals(steps('dnsProviderStep').providerType, 'Route53'), true, false)]"
@@ -847,6 +890,27 @@
               "label": "Google Cloud DNS",
               "elements": [
                 {
+                  "name": "credentialType",
+                  "type": "Microsoft.Common.OptionsGroup",
+                  "label": "Credential type",
+                  "toolTip": "Choose how Acmebot authenticates to Google Cloud DNS.",
+                  "defaultValue": "workloadIdentity",
+                  "constraints": {
+                    "allowedValues": [
+                      {
+                        "label": "Workload identity federation",
+                        "value": "workloadIdentity"
+                      },
+                      {
+                        "label": "Service account key",
+                        "value": "keyFile64"
+                      }
+                    ],
+                    "required": true
+                  },
+                  "visible": true
+                },
+                {
                   "name": "keyFile64",
                   "type": "Microsoft.Common.PasswordBox",
                   "label": {
@@ -860,7 +924,55 @@
                   "options": {
                     "hideConfirmation": true
                   },
-                  "visible": true
+                  "visible": "[if(equals(steps('dnsProviderStep').googleDnsSection.credentialType, 'keyFile64'), true, false)]"
+                },
+                {
+                  "name": "projectId",
+                  "type": "Microsoft.Common.TextBox",
+                  "label": "Project ID",
+                  "placeholder": "my-gcp-project",
+                  "defaultValue": "",
+                  "toolTip": "Google Cloud project ID that contains the Cloud DNS managed zones.",
+                  "constraints": {
+                    "required": true
+                  },
+                  "visible": "[if(equals(steps('dnsProviderStep').googleDnsSection.credentialType, 'workloadIdentity'), true, false)]"
+                },
+                {
+                  "name": "poolProvider",
+                  "type": "Microsoft.Common.TextBox",
+                  "label": "Workload identity provider",
+                  "placeholder": "projects/123456789/locations/global/workloadIdentityPools/acmebot/providers/azure",
+                  "defaultValue": "",
+                  "toolTip": "Google workload identity provider resource name without the leading //iam.googleapis.com/ prefix.",
+                  "constraints": {
+                    "required": true
+                  },
+                  "visible": "[if(equals(steps('dnsProviderStep').googleDnsSection.credentialType, 'workloadIdentity'), true, false)]"
+                },
+                {
+                  "name": "serviceAccount",
+                  "type": "Microsoft.Common.TextBox",
+                  "label": "Service account",
+                  "placeholder": "acmebot-dns@my-gcp-project.iam.gserviceaccount.com",
+                  "defaultValue": "",
+                  "toolTip": "Google service account that Acmebot impersonates for Cloud DNS operations.",
+                  "constraints": {
+                    "required": true
+                  },
+                  "visible": "[if(equals(steps('dnsProviderStep').googleDnsSection.credentialType, 'workloadIdentity'), true, false)]"
+                },
+                {
+                  "name": "managedIdentityClientId",
+                  "type": "Microsoft.Common.TextBox",
+                  "label": "Managed identity client ID",
+                  "placeholder": "Leave empty to use the app-wide identity",
+                  "defaultValue": "",
+                  "toolTip": "Optional client ID of a user-assigned managed identity assigned to the Function App for Google Cloud DNS workload identity federation.",
+                  "constraints": {
+                    "required": false
+                  },
+                  "visible": "[if(equals(steps('dnsProviderStep').googleDnsSection.credentialType, 'workloadIdentity'), true, false)]"
                 }
               ],
               "visible": "[if(equals(steps('dnsProviderStep').providerType, 'GoogleDns'), true, false)]"
@@ -888,6 +1000,115 @@
                 }
               ],
               "visible": "[if(equals(steps('dnsProviderStep').providerType, 'IonosDns'), true, false)]"
+            },
+            {
+              "name": "ovhSection",
+              "type": "Microsoft.Common.Section",
+              "label": "OVH",
+              "elements": [
+                {
+                  "name": "applicationKey",
+                  "type": "Microsoft.Common.PasswordBox",
+                  "label": {
+                    "password": "Application key",
+                    "confirmPassword": "Confirm application key"
+                  },
+                  "toolTip": "OVH application key.",
+                  "constraints": {
+                    "required": true
+                  },
+                  "options": {
+                    "hideConfirmation": true
+                  },
+                  "visible": true
+                },
+                {
+                  "name": "applicationSecret",
+                  "type": "Microsoft.Common.PasswordBox",
+                  "label": {
+                    "password": "Application secret",
+                    "confirmPassword": "Confirm application secret"
+                  },
+                  "toolTip": "OVH application secret.",
+                  "constraints": {
+                    "required": true
+                  },
+                  "options": {
+                    "hideConfirmation": true
+                  },
+                  "visible": true
+                },
+                {
+                  "name": "consumerKey",
+                  "type": "Microsoft.Common.PasswordBox",
+                  "label": {
+                    "password": "Consumer key",
+                    "confirmPassword": "Confirm consumer key"
+                  },
+                  "toolTip": "OVH consumer key.",
+                  "constraints": {
+                    "required": true
+                  },
+                  "options": {
+                    "hideConfirmation": true
+                  },
+                  "visible": true
+                }
+              ],
+              "visible": "[if(equals(steps('dnsProviderStep').providerType, 'Ovh'), true, false)]"
+            },
+            {
+              "name": "powerDnsSection",
+              "type": "Microsoft.Common.Section",
+              "label": "PowerDNS",
+              "elements": [
+                {
+                  "name": "endpoint",
+                  "type": "Microsoft.Common.TextBox",
+                  "label": "API endpoint",
+                  "placeholder": "https://pdns.example.com/api/v1/",
+                  "toolTip": "Full base URL of the PowerDNS HTTP API, including /api/v1/.",
+                  "constraints": {
+                    "required": true,
+                    "validations": [
+                      {
+                        "regex": "^https?:\\/\\/.+",
+                        "message": "Enter a valid http(s) URL."
+                      }
+                    ]
+                  },
+                  "visible": true
+                },
+                {
+                  "name": "apiKey",
+                  "type": "Microsoft.Common.PasswordBox",
+                  "label": {
+                    "password": "API key",
+                    "confirmPassword": "Confirm API key"
+                  },
+                  "toolTip": "PowerDNS HTTP API key sent in the X-API-Key header.",
+                  "constraints": {
+                    "required": true
+                  },
+                  "options": {
+                    "hideConfirmation": true
+                  },
+                  "visible": true
+                },
+                {
+                  "name": "serverId",
+                  "type": "Microsoft.Common.TextBox",
+                  "label": "Server ID",
+                  "placeholder": "localhost",
+                  "defaultValue": "localhost",
+                  "toolTip": "PowerDNS server identifier (path segment after /servers/). Defaults to localhost.",
+                  "constraints": {
+                    "required": true
+                  },
+                  "visible": true
+                }
+              ],
+              "visible": "[if(equals(steps('dnsProviderStep').providerType, 'PowerDns'), true, false)]"
             },
             {
               "name": "regfishSection",
@@ -1153,13 +1374,13 @@
           "logAnalyticsWorkspaceName": "[if(equals(steps('loggingStep').createNew, 'create'), if(equals(steps('basics').namingRule, 'custom'), steps('loggingStep').logAnalyticsWorkspaceName, concat('log-', steps('basics').appPrefix)), '')]"
         },
         "acme": {
-          "endpoint": "[if(equals(steps('acmeStep').endpointSection.endpointType, 'known'), steps('acmeStep').endpointSection.knownEndpoint, steps('acmeStep').endpointSection.customEndpoint)]",
+          "endpoint": "[if(equals(steps('acmeStep').endpointSection.endpointType, 'verified'), steps('acmeStep').endpointSection.verifiedEndpoint, steps('acmeStep').endpointSection.customEndpoint)]",
           "contacts": "[steps('acmeStep').credentialSection.mailAddress]",
           "externalAccountBinding": {
-            "enabled": "[equals(steps('acmeStep').credentialSection.credentialType, 'eab')]",
-            "keyId": "[if(equals(steps('acmeStep').credentialSection.credentialType, 'eab'), steps('acmeStep').eabSection.keyId, '')]",
-            "hmacKey": "[if(equals(steps('acmeStep').credentialSection.credentialType, 'eab'), steps('acmeStep').eabSection.hmacKey, '')]",
-            "algorithm": "[if(equals(steps('acmeStep').credentialSection.credentialType, 'eab'), steps('acmeStep').eabSection.algorithm, 'HS256')]"
+            "enabled": "[or(and(equals(steps('acmeStep').endpointSection.endpointType, 'verified'), or(equals(coalesce(steps('acmeStep').endpointSection.verifiedEndpoint, ''), 'https://emea.acme.atlas.globalsign.com/directory'), equals(coalesce(steps('acmeStep').endpointSection.verifiedEndpoint, ''), 'https://dv.acme-v02.api.pki.goog/directory'), equals(coalesce(steps('acmeStep').endpointSection.verifiedEndpoint, ''), 'https://acme.ssl.com/sslcom-dv-ecc'), equals(coalesce(steps('acmeStep').endpointSection.verifiedEndpoint, ''), 'https://acme.ssl.com/sslcom-dv-rsa'), equals(coalesce(steps('acmeStep').endpointSection.verifiedEndpoint, ''), 'https://acme.zerossl.com/v2/DV90'))), equals(coalesce(steps('acmeStep').credentialSection.credentialType, ''), 'eab'))]",
+            "keyId": "[if(or(and(equals(steps('acmeStep').endpointSection.endpointType, 'verified'), or(equals(coalesce(steps('acmeStep').endpointSection.verifiedEndpoint, ''), 'https://emea.acme.atlas.globalsign.com/directory'), equals(coalesce(steps('acmeStep').endpointSection.verifiedEndpoint, ''), 'https://dv.acme-v02.api.pki.goog/directory'), equals(coalesce(steps('acmeStep').endpointSection.verifiedEndpoint, ''), 'https://acme.ssl.com/sslcom-dv-ecc'), equals(coalesce(steps('acmeStep').endpointSection.verifiedEndpoint, ''), 'https://acme.ssl.com/sslcom-dv-rsa'), equals(coalesce(steps('acmeStep').endpointSection.verifiedEndpoint, ''), 'https://acme.zerossl.com/v2/DV90'))), equals(coalesce(steps('acmeStep').credentialSection.credentialType, ''), 'eab')), steps('acmeStep').eabSection.keyId, '')]",
+            "hmacKey": "[if(or(and(equals(steps('acmeStep').endpointSection.endpointType, 'verified'), or(equals(coalesce(steps('acmeStep').endpointSection.verifiedEndpoint, ''), 'https://emea.acme.atlas.globalsign.com/directory'), equals(coalesce(steps('acmeStep').endpointSection.verifiedEndpoint, ''), 'https://dv.acme-v02.api.pki.goog/directory'), equals(coalesce(steps('acmeStep').endpointSection.verifiedEndpoint, ''), 'https://acme.ssl.com/sslcom-dv-ecc'), equals(coalesce(steps('acmeStep').endpointSection.verifiedEndpoint, ''), 'https://acme.ssl.com/sslcom-dv-rsa'), equals(coalesce(steps('acmeStep').endpointSection.verifiedEndpoint, ''), 'https://acme.zerossl.com/v2/DV90'))), equals(coalesce(steps('acmeStep').credentialSection.credentialType, ''), 'eab')), steps('acmeStep').eabSection.hmacKey, '')]",
+            "algorithm": "[if(or(and(equals(steps('acmeStep').endpointSection.endpointType, 'verified'), or(equals(coalesce(steps('acmeStep').endpointSection.verifiedEndpoint, ''), 'https://emea.acme.atlas.globalsign.com/directory'), equals(coalesce(steps('acmeStep').endpointSection.verifiedEndpoint, ''), 'https://dv.acme-v02.api.pki.goog/directory'), equals(coalesce(steps('acmeStep').endpointSection.verifiedEndpoint, ''), 'https://acme.ssl.com/sslcom-dv-ecc'), equals(coalesce(steps('acmeStep').endpointSection.verifiedEndpoint, ''), 'https://acme.ssl.com/sslcom-dv-rsa'), equals(coalesce(steps('acmeStep').endpointSection.verifiedEndpoint, ''), 'https://acme.zerossl.com/v2/DV90'))), equals(coalesce(steps('acmeStep').credentialSection.credentialType, ''), 'eab')), steps('acmeStep').eabSection.algorithm, 'HS256')]"
           }
         },
         "dnsProvider": {
@@ -1171,9 +1392,9 @@
             "accessToken": "[if(equals(steps('dnsProviderStep').providerType, 'Akamai'), steps('dnsProviderStep').akamaiSection.accessToken, '')]"
           },
           "route53": {
-            "accessKey": "[if(equals(steps('dnsProviderStep').providerType, 'Route53'), steps('dnsProviderStep').route53Section.accessKey, '')]",
-            "secretKey": "[if(equals(steps('dnsProviderStep').providerType, 'Route53'), steps('dnsProviderStep').route53Section.secretKey, '')]",
-            "region": "[if(equals(steps('dnsProviderStep').providerType, 'Route53'), steps('dnsProviderStep').route53Section.region, '')]"
+            "roleArn": "[if(equals(steps('dnsProviderStep').providerType, 'Route53'), if(equals(steps('dnsProviderStep').route53Section.credentialType, 'roleArn'), steps('dnsProviderStep').route53Section.roleArn, ''), '')]",
+            "accessKey": "[if(equals(steps('dnsProviderStep').providerType, 'Route53'), if(equals(steps('dnsProviderStep').route53Section.credentialType, 'accessKey'), steps('dnsProviderStep').route53Section.accessKey, ''), '')]",
+            "secretKey": "[if(equals(steps('dnsProviderStep').providerType, 'Route53'), if(equals(steps('dnsProviderStep').route53Section.credentialType, 'accessKey'), steps('dnsProviderStep').route53Section.secretKey, ''), '')]"
           },
           "azureDns": {
             "subscriptionId": "[if(equals(steps('dnsProviderStep').providerType, 'AzureDns'), steps('dnsProviderStep').azureDnsSection.subscriptionId, '')]"
@@ -1202,10 +1423,24 @@
             "apiSecret": "[if(equals(steps('dnsProviderStep').providerType, 'GoDaddy'), steps('dnsProviderStep').goDaddySection.apiSecret, '')]"
           },
           "googleDns": {
-            "keyFile64": "[if(equals(steps('dnsProviderStep').providerType, 'GoogleDns'), steps('dnsProviderStep').googleDnsSection.keyFile64, '')]"
+            "keyFile64": "[if(equals(steps('dnsProviderStep').providerType, 'GoogleDns'), if(equals(steps('dnsProviderStep').googleDnsSection.credentialType, 'keyFile64'), steps('dnsProviderStep').googleDnsSection.keyFile64, ''), '')]",
+            "projectId": "[if(equals(steps('dnsProviderStep').providerType, 'GoogleDns'), if(equals(steps('dnsProviderStep').googleDnsSection.credentialType, 'workloadIdentity'), steps('dnsProviderStep').googleDnsSection.projectId, ''), '')]",
+            "poolProvider": "[if(equals(steps('dnsProviderStep').providerType, 'GoogleDns'), if(equals(steps('dnsProviderStep').googleDnsSection.credentialType, 'workloadIdentity'), steps('dnsProviderStep').googleDnsSection.poolProvider, ''), '')]",
+            "serviceAccount": "[if(equals(steps('dnsProviderStep').providerType, 'GoogleDns'), if(equals(steps('dnsProviderStep').googleDnsSection.credentialType, 'workloadIdentity'), steps('dnsProviderStep').googleDnsSection.serviceAccount, ''), '')]",
+            "managedIdentityClientId": "[if(equals(steps('dnsProviderStep').providerType, 'GoogleDns'), if(equals(steps('dnsProviderStep').googleDnsSection.credentialType, 'workloadIdentity'), steps('dnsProviderStep').googleDnsSection.managedIdentityClientId, ''), '')]"
           },
           "ionosDns": {
             "apiKey": "[if(equals(steps('dnsProviderStep').providerType, 'IonosDns'), steps('dnsProviderStep').ionosDnsSection.apiKey, '')]"
+          },
+          "ovh": {
+            "applicationKey": "[if(equals(steps('dnsProviderStep').providerType, 'Ovh'), steps('dnsProviderStep').ovhSection.applicationKey, '')]",
+            "applicationSecret": "[if(equals(steps('dnsProviderStep').providerType, 'Ovh'), steps('dnsProviderStep').ovhSection.applicationSecret, '')]",
+            "consumerKey": "[if(equals(steps('dnsProviderStep').providerType, 'Ovh'), steps('dnsProviderStep').ovhSection.consumerKey, '')]"
+          },
+          "powerDns": {
+            "endpoint": "[if(equals(steps('dnsProviderStep').providerType, 'PowerDns'), steps('dnsProviderStep').powerDnsSection.endpoint, '')]",
+            "apiKey": "[if(equals(steps('dnsProviderStep').providerType, 'PowerDns'), steps('dnsProviderStep').powerDnsSection.apiKey, '')]",
+            "serverId": "[if(equals(steps('dnsProviderStep').providerType, 'PowerDns'), steps('dnsProviderStep').powerDnsSection.serverId, '')]"
           },
           "regfish": {
             "apiKey": "[if(equals(steps('dnsProviderStep').providerType, 'Regfish'), steps('dnsProviderStep').regfishSection.apiKey, '')]"

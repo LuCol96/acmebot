@@ -71,6 +71,7 @@ public sealed class AcmeClientTests
 
         var accountRequest = Assert.Single(handler.Requests, x => x.Method == HttpMethod.Post);
         using var payload = accountRequest.GetPayloadJson();
+        using var protectedHeader = accountRequest.GetProtectedHeaderJson();
         var contact = payload.RootElement.GetProperty("contact");
 
         Assert.Equal("mailto:admin@example.com", Assert.Single(contact.EnumerateArray()).GetString());
@@ -80,6 +81,10 @@ public sealed class AcmeClientTests
         Assert.False(string.IsNullOrWhiteSpace(externalAccountBinding.GetProperty("protected").GetString()));
         Assert.False(string.IsNullOrWhiteSpace(externalAccountBinding.GetProperty("payload").GetString()));
         Assert.False(string.IsNullOrWhiteSpace(externalAccountBinding.GetProperty("signature").GetString()));
+
+        // Outer JWS protected header must have jwk but NOT kid (RFC 8555 §7.3.4)
+        Assert.True(protectedHeader.RootElement.TryGetProperty("jwk", out _), "Outer JWS must contain jwk for new account creation");
+        Assert.False(protectedHeader.RootElement.TryGetProperty("kid", out _), "Outer JWS must not contain kid for new account creation");
     }
 
     [Fact]
@@ -160,6 +165,80 @@ public sealed class AcmeClientTests
         Assert.Equal("mailto:new@example.com", Assert.Single(payload.RootElement.GetProperty("contact").EnumerateArray()).GetString());
         Assert.Equal(account.AccountUrl.OriginalString, protectedHeader.RootElement.GetProperty("kid").GetString());
         Assert.Equal("mailto:new@example.com", Assert.Single(result.Account.Contact));
+    }
+
+    [Fact]
+    public async Task UpdateAccountAsync_UsesResponseNonceForNextChallengeRequest()
+    {
+        var directoryUrl = new Uri("https://example.com/acme/directory");
+        var challengeUrl = new Uri("https://example.com/acme/challenge/1");
+        using var signer = AcmeSigner.CreateP256();
+        using var handler = new RecordingHandler();
+        using var httpClient = new HttpClient(handler);
+        using var client = new AcmeClient(httpClient, directoryUrl);
+        var account = AcmeTestSupport.CreateAccountHandle(signer);
+
+        AcmeTestSupport.EnqueueDirectory(handler);
+        AcmeTestSupport.EnqueueNonce(handler, "bm9uY2Ux");
+        handler.Enqueue(_ => AcmeTestSupport.CreateJsonResponse(HttpStatusCode.OK, new
+        {
+            status = "valid",
+            contact = new[] { "mailto:new@example.com" }
+        }, replayNonce: "bm9uY2Uy"));
+        handler.Enqueue(_ => AcmeTestSupport.CreateJsonResponse(
+            HttpStatusCode.OK,
+            new { type = "dns-01", url = challengeUrl, status = "pending" },
+            replayNonce: "bm9uY2Uz"));
+
+        account = await client.UpdateAccountAsync(account, new AcmeUpdateAccountRequest { Contact = ["mailto:new@example.com"] }, TestContext.Current.CancellationToken);
+        await client.AnswerChallengeAsync(account, challengeUrl, TestContext.Current.CancellationToken);
+
+        var postRequests = handler.Requests.Where(x => x.Method == HttpMethod.Post).ToArray();
+        Assert.Equal(2, postRequests.Length);
+        Assert.Single(handler.Requests, x => x.Method == HttpMethod.Head);
+
+        using var accountProtectedHeader = postRequests[0].GetProtectedHeaderJson();
+        using var challengeProtectedHeader = postRequests[1].GetProtectedHeaderJson();
+        Assert.Equal("bm9uY2Ux", accountProtectedHeader.RootElement.GetProperty("nonce").GetString());
+        Assert.Equal("bm9uY2Uy", challengeProtectedHeader.RootElement.GetProperty("nonce").GetString());
+    }
+
+    [Fact]
+    public async Task UpdateAccountAsync_UsesResponseNonceForNextCertificateRequest()
+    {
+        var directoryUrl = new Uri("https://example.com/acme/directory");
+        var certificateUrl = new Uri("https://example.com/acme/cert/1");
+        using var signer = AcmeSigner.CreateP256();
+        using var certificate = AcmeTestSupport.CreateCertificate();
+        using var handler = new RecordingHandler();
+        using var httpClient = new HttpClient(handler);
+        using var client = new AcmeClient(httpClient, directoryUrl);
+        var account = AcmeTestSupport.CreateAccountHandle(signer);
+
+        AcmeTestSupport.EnqueueDirectory(handler);
+        AcmeTestSupport.EnqueueNonce(handler, "bm9uY2Ux");
+        handler.Enqueue(_ => AcmeTestSupport.CreateJsonResponse(HttpStatusCode.OK, new
+        {
+            status = "valid",
+            contact = new[] { "mailto:new@example.com" }
+        }, replayNonce: "bm9uY2Uy"));
+        handler.Enqueue(_ => AcmeTestSupport.CreateResponse(
+            HttpStatusCode.OK,
+            certificate.ExportCertificatePem(),
+            AcmeTestSupport.PemCertificateChainMediaType,
+            replayNonce: "bm9uY2Uz"));
+
+        account = await client.UpdateAccountAsync(account, new AcmeUpdateAccountRequest { Contact = ["mailto:new@example.com"] }, TestContext.Current.CancellationToken);
+        await client.DownloadCertificateAsync(account, certificateUrl, TestContext.Current.CancellationToken);
+
+        var postRequests = handler.Requests.Where(x => x.Method == HttpMethod.Post).ToArray();
+        Assert.Equal(2, postRequests.Length);
+        Assert.Single(handler.Requests, x => x.Method == HttpMethod.Head);
+
+        using var accountProtectedHeader = postRequests[0].GetProtectedHeaderJson();
+        using var certificateProtectedHeader = postRequests[1].GetProtectedHeaderJson();
+        Assert.Equal("bm9uY2Ux", accountProtectedHeader.RootElement.GetProperty("nonce").GetString());
+        Assert.Equal("bm9uY2Uy", certificateProtectedHeader.RootElement.GetProperty("nonce").GetString());
     }
 
     [Fact]

@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 
 using Acmebot.App.Acme;
 using Acmebot.App.Extensions;
@@ -6,6 +6,7 @@ using Acmebot.App.Infrastructure;
 using Acmebot.App.Notifications;
 using Acmebot.App.Options;
 using Acmebot.App.Providers;
+using Acmebot.App.Services;
 
 using Azure.Core;
 using Azure.Functions.Worker.Extensions.HttpApi.Config;
@@ -18,6 +19,7 @@ using DnsClient;
 
 using Microsoft.Azure.Functions.Worker.Builder;
 using Microsoft.Azure.Functions.Worker.OpenTelemetry;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -49,12 +51,13 @@ builder.Services.AddOptions<AcmebotOptions>()
 
 // Add Services
 builder.Services.AddHttpClient();
+builder.Services.AddSingleton<AppRoleService>();
 
 builder.Services.AddSingleton(provider =>
 {
-    var options = provider.GetRequiredService<IOptions<AcmebotOptions>>();
+    var options = provider.GetRequiredService<IOptions<AcmebotOptions>>().Value;
 
-    var lookupClientOptions = options.Value.UseSystemNameServer ? new LookupClientOptions() : new LookupClientOptions(NameServer.GooglePublicDns, NameServer.GooglePublicDns2);
+    var lookupClientOptions = options.UseSystemNameServer ? new LookupClientOptions() : new LookupClientOptions(NameServer.GooglePublicDns, NameServer.GooglePublicDns2);
 
     lookupClientOptions.UseCache = false;
     lookupClientOptions.UseRandomNameServer = true;
@@ -64,31 +67,80 @@ builder.Services.AddSingleton(provider =>
 
 builder.Services.AddSingleton(provider =>
 {
-    var options = provider.GetRequiredService<IOptions<AcmebotOptions>>();
+    var options = provider.GetRequiredService<IOptions<AcmebotOptions>>().Value;
 
-    return AzureEnvironment.Get(options.Value.Environment);
+    return AzureEnvironment.Get(options.Environment);
 });
 
 builder.Services.AddSingleton<TokenCredential>(provider =>
 {
     var environment = provider.GetRequiredService<AzureEnvironment>();
-    var options = provider.GetRequiredService<IOptions<AcmebotOptions>>();
+    var options = provider.GetRequiredService<IOptions<AcmebotOptions>>().Value;
 
-    return new DefaultAzureCredential(new DefaultAzureCredentialOptions
+    var managedIdentityId = string.IsNullOrWhiteSpace(options.ManagedIdentityClientId) ? ManagedIdentityId.SystemAssigned : ManagedIdentityId.FromUserAssignedClientId(options.ManagedIdentityClientId);
+
+    return new ManagedIdentityCredential(new ManagedIdentityCredentialOptions(managedIdentityId)
     {
-        AuthorityHost = environment.AuthorityHost,
-        ManagedIdentityClientId = options.Value.ManagedIdentityClientId
+        AuthorityHost = environment.AuthorityHost
     });
 });
 
 builder.Services.AddSingleton(provider =>
 {
-    var options = provider.GetRequiredService<IOptions<AcmebotOptions>>();
+    var options = provider.GetRequiredService<IOptions<AcmebotOptions>>().Value;
     var credential = provider.GetRequiredService<TokenCredential>();
 
-    return new CertificateClient(new Uri(options.Value.VaultBaseUrl), credential);
+    return new CertificateClient(new Uri(options.VaultBaseUrl), credential);
 });
 
+builder.Services.AddSingleton(provider =>
+{
+    const string acmeStateContainerName = "acmebot-state";
+
+    var environment = provider.GetRequiredService<AzureEnvironment>();
+    var configuration = provider.GetRequiredService<IConfiguration>();
+
+    var connectionString = configuration["AzureWebJobsStorage"];
+
+    if (!string.IsNullOrWhiteSpace(connectionString))
+    {
+        return new BlobContainerClient(connectionString, acmeStateContainerName);
+    }
+
+    var blobServiceUri = configuration["AzureWebJobsStorage__blobServiceUri"];
+
+    if (string.IsNullOrWhiteSpace(blobServiceUri))
+    {
+        var accountName = configuration["AzureWebJobsStorage__accountName"];
+
+        if (string.IsNullOrWhiteSpace(accountName))
+        {
+            throw new InvalidOperationException("AzureWebJobsStorage, AzureWebJobsStorage__blobServiceUri, or AzureWebJobsStorage__accountName is required.");
+        }
+
+        blobServiceUri = $"https://{accountName}.blob.core.windows.net";
+    }
+
+    var clientId = configuration["AzureWebJobsStorage__clientId"];
+
+    var managedIdentityId = string.IsNullOrWhiteSpace(clientId) ? ManagedIdentityId.SystemAssigned : ManagedIdentityId.FromUserAssignedClientId(clientId);
+
+    var credential = new ManagedIdentityCredential(new ManagedIdentityCredentialOptions(managedIdentityId)
+    {
+        AuthorityHost = environment.AuthorityHost
+    });
+
+    return new BlobContainerClient(new Uri(new Uri(blobServiceUri.TrimEnd('/') + "/"), acmeStateContainerName), credential);
+});
+
+builder.Services.AddSingleton<BlobAcmeStateStore>();
+builder.Services.AddSingleton<FileSystemAcmeStateStore>();
+builder.Services.AddSingleton<IAcmeStateStore>(provider =>
+{
+    var configuration = provider.GetRequiredService<IConfiguration>();
+
+    return HasAzureFilesContentShare(configuration) ? provider.GetRequiredService<FileSystemAcmeStateStore>() : provider.GetRequiredService<BlobAcmeStateStore>();
+});
 builder.Services.AddSingleton<AcmeClientFactory>();
 
 // Add Webhook invoker
@@ -123,23 +175,31 @@ builder.Services.AddSingleton<IEnumerable<IDnsProvider>>(provider =>
 {
     var options = provider.GetRequiredService<IOptions<AcmebotOptions>>().Value;
     var environment = provider.GetRequiredService<AzureEnvironment>();
-    var credential = provider.GetRequiredService<TokenCredential>();
+    var tokenCredential = provider.GetRequiredService<TokenCredential>();
 
     var dnsProviders = new List<IDnsProvider>();
 
     dnsProviders.TryAdd(options.Akamai, o => new AkamaiEdgeDnsProvider(o));
-    dnsProviders.TryAdd(options.AzureDns, o => new AzureDnsProvider(o, environment, credential));
-    dnsProviders.TryAdd(options.AzurePrivateDns, o => new AzurePrivateDnsProvider(o, environment, credential));
+    dnsProviders.TryAdd(options.AzureDns, o => new AzureDnsProvider(
+        o,
+        environment,
+        ResolveCredential(environment, tokenCredential, o.ManagedIdentityClientId)));
+    dnsProviders.TryAdd(options.AzurePrivateDns, o => new AzurePrivateDnsProvider(
+        o,
+        environment,
+        ResolveCredential(environment, tokenCredential, o.ManagedIdentityClientId)));
     dnsProviders.TryAdd(options.Cloudflare, o => new CloudflareProvider(o));
     dnsProviders.TryAdd(options.CustomDns, o => new CustomDnsProvider(o));
     dnsProviders.TryAdd(options.DnsMadeEasy, o => new DnsMadeEasyProvider(o));
     dnsProviders.TryAdd(options.GandiLiveDns, o => new GandiLiveDnsProvider(o));
     dnsProviders.TryAdd(options.GoDaddy, o => new GoDaddyProvider(o));
-    dnsProviders.TryAdd(options.GoogleDns, o => new GoogleDnsProvider(o));
+    dnsProviders.TryAdd(options.GoogleDns, o => new GoogleDnsProvider(o, ResolveCredential(environment, tokenCredential, o.ManagedIdentityClientId)));
     dnsProviders.TryAdd(options.IonosDns, o => new IonosDnsProvider(o));
+    dnsProviders.TryAdd(options.Ovh, o => new OvhProvider(o));
+    dnsProviders.TryAdd(options.PowerDns, o => new PowerDnsProvider(o));
     dnsProviders.TryAdd(options.Regfish, o => new RegfishProvider(o));
-    dnsProviders.TryAdd(options.Route53, o => new Route53Provider(o));
-    dnsProviders.TryAdd(options.TransIp, o => new TransIpProvider(options, o, credential));
+    dnsProviders.TryAdd(options.Route53, o => new Route53Provider(o, ResolveCredential(environment, tokenCredential, o.ManagedIdentityClientId)));
+    dnsProviders.TryAdd(options.TransIp, o => new TransIpProvider(options, o, tokenCredential));
     dnsProviders.TryAdd(options.UnitedDomains, o => new UnitedDomainsProvider(o));
 
     if (dnsProviders.Count == 0)
@@ -149,19 +209,39 @@ builder.Services.AddSingleton<IEnumerable<IDnsProvider>>(provider =>
 
     return dnsProviders;
 });
-
 builder.Services.AddSingleton(provider =>
 {
     var connectionString = builder.Configuration["AzureWebJobsStorage"]
         ?? throw new InvalidOperationException("AzureWebJobsStorage is not configured.");
+
     var containerClient = new BlobContainerClient(connectionString, "acmebot");
     containerClient.CreateIfNotExists();
-    
+
     // Debug: explizit testen ob Schreiben funktioniert
     var testBlob = containerClient.GetBlobClient("_test/write-test.txt");
     testBlob.Upload(BinaryData.FromString("test"), overwrite: true);
-    
+
     return containerClient;
 });
 
 builder.Build().Run();
+
+return;
+
+static bool HasAzureFilesContentShare(IConfiguration configuration)
+    => !string.IsNullOrEmpty(configuration["WEBSITE_CONTENTAZUREFILECONNECTIONSTRING"]) || !string.IsNullOrEmpty(configuration["WEBSITE_CONTENTSHARE"]);
+
+static TokenCredential ResolveCredential(AzureEnvironment environment, TokenCredential tokenCredential, string? managedIdentityClientId)
+{
+    if (string.IsNullOrWhiteSpace(managedIdentityClientId))
+    {
+        return tokenCredential;
+    }
+
+    var managedIdentityId = ManagedIdentityId.FromUserAssignedClientId(managedIdentityClientId);
+
+    return new ManagedIdentityCredential(new ManagedIdentityCredentialOptions(managedIdentityId)
+    {
+        AuthorityHost = environment.AuthorityHost
+    });
+}

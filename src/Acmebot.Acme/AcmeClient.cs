@@ -18,10 +18,7 @@ public sealed class AcmeClient : IDisposable
     private const string JoseMediaType = "application/jose+json";
     private const string PemCertificateChainMediaType = "application/pem-certificate-chain";
 
-    private static readonly JsonSerializerOptions s_jsonSerializerOptions = new()
-    {
-        TypeInfoResolver = AcmeJsonSerializerContext.Default
-    };
+    private static readonly JsonSerializerOptions s_jsonSerializerOptions = AcmeJsonSerializerContext.Default.Options;
 
     private readonly HttpClient _httpClient;
     private readonly Uri _directoryUrl;
@@ -638,6 +635,7 @@ public sealed class AcmeClient : IDisposable
 
             using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
             var rawResponse = await ToRawResponseAsync(response, cancellationToken).ConfigureAwait(false);
+            _nonceStore.Add(rawResponse.ReplayNonce);
 
             if (response.IsSuccessStatusCode)
             {
@@ -763,11 +761,6 @@ public sealed class AcmeClient : IDisposable
     private async Task<AcmeRawResponse> ToRawResponseAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         var replayNonce = TryGetSingleHeaderValue(response.Headers, "Replay-Nonce");
-
-        if (!string.IsNullOrWhiteSpace(replayNonce))
-        {
-            _nonceStore.Add(replayNonce);
-        }
 
         var body = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
 

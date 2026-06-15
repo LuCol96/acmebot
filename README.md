@@ -2,9 +2,9 @@
   Acmebot for Microsoft Azure
 </h1>
 <p align="center">
-  Automated ACME SSL/TLS certificate management built around Azure Key Vault
+  ACME SSL/TLS certificate automation for Microsoft Azure, built around DNS-01 validation and Azure Key Vault
   <br>
-  (App Service / Container Apps / Application Gateway / Front Door / CDN / others)
+  (App Service / Container Apps / Application Gateway / Front Door / others)
 </p>
 <p align="center">
   <a href="https://github.com/polymind-inc/acmebot/actions/workflows/build.yml" rel="nofollow"><img src="https://github.com/polymind-inc/acmebot/workflows/Build/badge.svg" alt="Build" style="max-width: 100%;"></a>
@@ -15,33 +15,33 @@
   <a href="https://registry.terraform.io/modules/polymind-inc/acmebot/azurerm/latest" rel="nofollow"><img src="https://badgen.net/badge/terraform/registry/5c4ee5" alt="Terraform" style="max-width: 100%;"></a>
   <br>
   <a href="https://github.com/polymind-inc/acmebot/commits/master" rel="nofollow"><img src="https://badgen.net/github/last-commit/polymind-inc/acmebot" alt="Last commit" style="max-width: 100%;"></a>
-  <a href="https://github.com/polymind-inc/acmebot/wiki" rel="nofollow"><img src="https://badgen.net/badge/documentation/available/ff7733" alt="Documentation" style="max-width: 100%;"></a>
+  <a href="https://acmebot.dev/guide/" rel="nofollow"><img src="https://badgen.net/badge/documentation/available/ff7733" alt="Documentation" style="max-width: 100%;"></a>
   <a href="https://github.com/polymind-inc/acmebot/discussions" rel="nofollow"><img src="https://badgen.net/badge/discussions/welcome/ff7733" alt="Discussions" style="max-width: 100%;"></a>
 </p>
 
 ## Motivation
 
-Acmebot was created to address the following requirements:
+Acmebot helps Azure platform and operations teams automate ACME certificate issuance and renewal without building a dedicated certificate pipeline. It uses DNS-01 validation, stores private keys and issued certificates in Azure Key Vault, and exposes a dashboard and HTTP API for day-to-day operations.
 
-- Securely store SSL/TLS certificates with Azure Key Vault
-- Centralize management of large numbers of certificates with a single Key Vault
-- Easy to deploy and configure solution
-- Highly reliable implementation
-- Easy to monitor (Application Insights, Webhook)
+Acmebot is designed for teams that need to:
 
-Acmebot uses Azure Key Vault to provide secure and centralized management of ACME certificates.
+- Store SSL/TLS certificates securely in Azure Key Vault
+- Centralize certificates for multiple Azure services and domains
+- Automate issuance and renewal with predictable operational behavior
+- Monitor certificate operations through Application Insights and webhooks
+- Keep DNS provider credentials and Azure access scoped to the resources Acmebot manages
 
 ## Feature Support
 
-- Issue certificates for Zone Apex, Wildcard and SANs (multiple domains)
-- Dedicated dashboard for easy certificate management
+- Issue certificates for zone apex names, wildcards, and SANs (multiple domains)
+- Dedicated dashboard for certificate management
 - Automated certificate renewal
 - Support for ACME v2 compliant Certification Authorities
   - [Let's Encrypt](https://letsencrypt.org/)
-  - [ZeroSSL](https://zerossl.com/features/acme/) (Requires EAB Credentials)
+  - [GlobalSign](https://www.globalsign.com/) (Requires EAB Credentials)
   - [Google Trust Services](https://pki.goog/) (Requires EAB Credentials)
   - [SSL.com](https://www.ssl.com/how-to/order-free-90-day-ssl-tls-certificates-with-acme/) (Requires EAB Credentials)
-  - [Entrust](https://www.entrust.com/) (Requires EAB Credentials)
+  - [ZeroSSL](https://zerossl.com/features/acme/) (Requires EAB Credentials)
 - Certificates can be used with many Azure services
   - Azure App Service (Web Apps / Functions / Containers)
   - Azure Container Apps (Include custom DNS suffix)
@@ -53,15 +53,13 @@ Acmebot uses Azure Key Vault to provide secure and centralized management of ACM
 
 ## Deployment
 
-Deploy the latest **v5** release with a single click. The template provisions everything required — Function App ([Flex Consumption](https://learn.microsoft.com/en-us/azure/azure-functions/flex-consumption-plan)), Storage, Application Insights, Log Analytics, and optionally a new Key Vault.
+Acmebot **v5 is generally available**. Deploy the latest release with a single click. The template provisions the required Function App ([Flex Consumption](https://learn.microsoft.com/en-us/azure/azure-functions/flex-consumption-plan)), Storage, Application Insights, Log Analytics, and optionally a new Key Vault.
 
-| Azure (Public) | Azure China | Azure Government |
-| :---: | :---: | :---: |
-| <a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fpolymind-inc%2Facmebot%2Fmaster%2Fdeploy%2Fazuredeploy_ui.json/uiFormDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Fpolymind-inc%2Facmebot%2Fmaster%2Fdeploy%2FuiFormDefinition.json" target="_blank"><img src="https://aka.ms/deploytoazurebutton" /></a> | <a href="https://portal.azure.cn/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fpolymind-inc%2Facmebot%2Fmaster%2Fdeploy%2Fazuredeploy_ui.json/uiFormDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Fpolymind-inc%2Facmebot%2Fmaster%2Fdeploy%2FuiFormDefinition.json" target="_blank"><img src="https://aka.ms/deploytoazurebutton" /></a> | <a href="https://portal.azure.us/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fpolymind-inc%2Facmebot%2Fmaster%2Fdeploy%2Fazuredeploy_ui.json/uiFormDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Fpolymind-inc%2Facmebot%2Fmaster%2Fdeploy%2FuiFormDefinition.json" target="_blank"><img src="https://aka.ms/deploytoazurebutton" /></a> |
+The v5 deployment template supports the Azure public cloud only because Flex Consumption is not available in Azure China or Azure Government.
 
-> Already running Acmebot? Use the [update template](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fpolymind-inc%2Facmebot%2Fmaster%2Fdeploy%2Fazuredeploy_update.json/uiFormDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Fpolymind-inc%2Facmebot%2Fmaster%2Fdeploy%2FuiFormDefinition_update.json) to upgrade an existing deployment in place.
+<a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fpolymind-inc%2Facmebot%2Fmaster%2Fdeploy%2Fazuredeploy.json/uiFormDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Fpolymind-inc%2Facmebot%2Fmaster%2Fdeploy%2FuiFormDefinition.json" target="_blank"><img src="https://aka.ms/deploytoazurebutton" /></a>
 
-For detailed setup instructions and DNS provider configuration, see the [Getting Started](https://github.com/polymind-inc/acmebot/wiki/Getting-Started) guide.
+For detailed setup instructions and DNS provider configuration, see the [Getting Started](https://acmebot.dev/guide/getting-started.html) guide.
 
 ## Sponsors
 
@@ -76,12 +74,13 @@ Thank you for your support of our development. Interested in supporting the proj
 
 ## Commercial Support
 
-Commercial support for Acmebot is planned to be offered by Polymind Inc.
+Commercial support for Acmebot v5 is now available from Polymind Inc.
 
-Details of the support offerings are not yet finalized and will be announced separately.
-Acmebot remains fully open source and free to use under the Apache License 2.0.
+Commercial support is optional and intended for organizations running Acmebot in production. It can cover deployment planning, v4-to-v5 migration, Azure and DNS provider configuration, troubleshooting, and operational guidance.
 
-If you are interested in future commercial support, please reach out to [Polymind Inc.](https://github.com/polymind-inc)
+Acmebot remains fully open source and free to use under the Apache License 2.0. Community questions and bug reports continue to be handled through GitHub Discussions and Issues.
+
+To discuss commercial support, visit the [Polymind Acmebot support page](https://polymind.jp/acmebot) or see the [Support guide](https://acmebot.dev/guide/support.html).
 
 ## Community
 

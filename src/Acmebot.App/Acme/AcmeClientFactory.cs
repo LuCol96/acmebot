@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 
 using Acmebot.Acme;
 using Acmebot.Acme.Models;
@@ -14,13 +14,12 @@ namespace Acmebot.App.Acme;
 
 public class AcmeClientFactory(IOptions<AcmebotOptions> options, BlobContainerClient blobContainerClient)
 {
-    private readonly AcmebotOptions _options = options.Value;
-
     private static readonly JsonSerializerOptions s_jsonSerializerOptions = new()
     {
-        PropertyNameCaseInsensitive = true,
-        WriteIndented = true
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        IncludeFields = true
     };
+    private readonly AcmebotOptions _options = options.Value;
 
     public async Task<AcmeClientContext> CreateClientAsync()
     {

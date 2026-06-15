@@ -52,30 +52,10 @@
                   }
                 },
                 {
-                  "name": "majorVersion",
-                  "type": "Microsoft.Common.DropDown",
-                  "label": "Major version",
-                  "placeholder": "Major version",
-                  "defaultValue": {
-                    "value": "v5"
-                  },
-                  "toolTip": "Acmebot major version channel to deploy.",
-                  "constraints": {
-                    "allowedValues": [
-                      {
-                        "label": "v5",
-                        "value": "v5"
-                      }
-                    ],
-                    "required": true
-                  },
-                  "visible": true
-                },
-                {
                   "name": "targetVersionType",
                   "type": "Microsoft.Common.OptionsGroup",
                   "label": "Target version",
-                  "toolTip": "Deploy the latest package for the selected major version or enter a specific release version.",
+                  "toolTip": "Deploy the latest GitHub Release asset or enter a specific release version.",
                   "defaultValue": "latest",
                   "constraints": {
                     "allowedValues": [
@@ -97,7 +77,7 @@
                   "type": "Microsoft.Common.InfoBox",
                   "options": {
                     "style": "Warning",
-                    "text": "The specified package version must already be published. Deployment fails if the package cannot be found."
+                    "text": "The specified GitHub Release must already include the acmebot.zip asset. Deployment fails if the asset cannot be found."
                   },
                   "visible": "[if(equals(steps('basics').packageSection.targetVersionType, 'specific'), true, false)]"
                 },
@@ -131,7 +111,6 @@
       "location": "[steps('basics').targetSection.functionApp.location]",
       "parameters": {
         "functionAppName": "[steps('basics').targetSection.functionApp.name]",
-        "majorVersion": "[steps('basics').packageSection.majorVersion]",
         "targetVersion": "[if(equals(steps('basics').packageSection.targetVersionType, 'latest'), 'latest', steps('basics').packageSection.specificVersion)]"
       }
     }

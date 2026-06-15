@@ -21,11 +21,13 @@ public class DnsMadeEasyProvider(DnsMadeEasyOptions options) : IDnsProvider
     {
         var zones = await _dnsMadeEasyClient.ListDomainsAsync(cancellationToken);
 
-        return zones.Select(x => new DnsZone(this) { Id = x.Id, Name = x.Name }).ToArray();
+        return zones.Select(x => new DnsZone(this) { Id = x.Id.ToString(), Name = x.Name }).ToArray();
     }
 
     public async Task CreateTxtRecordAsync(DnsZone zone, string relativeRecordName, string[] values, CancellationToken cancellationToken = default)
     {
+        var zoneId = long.Parse(zone.Id);
+
         foreach (var value in values)
         {
             var record = new RecordParam
@@ -36,13 +38,15 @@ public class DnsMadeEasyProvider(DnsMadeEasyOptions options) : IDnsProvider
                 Value = value
             };
 
-            await _dnsMadeEasyClient.CreateRecordAsync(zone.Id, record, cancellationToken);
+            await _dnsMadeEasyClient.CreateRecordAsync(zoneId, record, cancellationToken);
         }
     }
 
     public async Task DeleteTxtRecordAsync(DnsZone zone, string relativeRecordName, CancellationToken cancellationToken = default)
     {
-        var records = await _dnsMadeEasyClient.ListRecordsAsync(zone.Id, cancellationToken);
+        var zoneId = long.Parse(zone.Id);
+
+        var records = await _dnsMadeEasyClient.ListRecordsAsync(zoneId, cancellationToken);
 
         var recordsToDelete = records.Where(x => x.Name == relativeRecordName && x.Type == "TXT");
 
@@ -50,7 +54,7 @@ public class DnsMadeEasyProvider(DnsMadeEasyOptions options) : IDnsProvider
         {
             try
             {
-                await _dnsMadeEasyClient.DeleteRecordAsync(zone.Id, record.Id, cancellationToken);
+                await _dnsMadeEasyClient.DeleteRecordAsync(zoneId, record.Id, cancellationToken);
             }
             catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
             {
@@ -73,28 +77,49 @@ public class DnsMadeEasyProvider(DnsMadeEasyOptions options) : IDnsProvider
 
         private readonly HttpClient _httpClient;
 
-        public async Task<IReadOnlyList<Domain>> ListDomainsAsync(CancellationToken cancellationToken = default)
+        public Task<IReadOnlyList<Domain>> ListDomainsAsync(CancellationToken cancellationToken = default)
         {
-            var result = await _httpClient.GetFromJsonAsync<PaginationArray<Domain>>("managed", cancellationToken);
-
-            return result?.Data ?? [];
+            return GetAllPagesAsync<Domain>("managed", cancellationToken);
         }
 
-        public async Task<IReadOnlyList<Record>> ListRecordsAsync(string zoneId, CancellationToken cancellationToken = default)
+        public Task<IReadOnlyList<Record>> ListRecordsAsync(long zoneId, CancellationToken cancellationToken = default)
         {
-            var entries = await _httpClient.GetFromJsonAsync<PaginationArray<Record>>($"managed/{zoneId}/records", cancellationToken);
-
-            return entries?.Data ?? [];
+            return GetAllPagesAsync<Record>($"managed/{zoneId}/records", cancellationToken);
         }
 
-        public async Task DeleteRecordAsync(string zoneId, string recordId, CancellationToken cancellationToken = default)
+        private async Task<IReadOnlyList<T>> GetAllPagesAsync<T>(string path, CancellationToken cancellationToken)
+        {
+            var items = new List<T>();
+            var page = 0;
+
+            while (true)
+            {
+                var result = await _httpClient.GetFromJsonAsync<PaginationArray<T>>($"{path}?page={page}", cancellationToken);
+
+                if (result?.Data is { Length: > 0 })
+                {
+                    items.AddRange(result.Data);
+                }
+
+                if (result is null || page >= result.TotalPages - 1)
+                {
+                    break;
+                }
+
+                page++;
+            }
+
+            return items;
+        }
+
+        public async Task DeleteRecordAsync(long zoneId, long recordId, CancellationToken cancellationToken = default)
         {
             var response = await _httpClient.DeleteAsync($"managed/{zoneId}/records/{recordId}", cancellationToken);
 
             response.EnsureSuccessStatusCode();
         }
 
-        public async Task CreateRecordAsync(string zoneId, RecordParam txtRecord, CancellationToken cancellationToken = default)
+        public async Task CreateRecordAsync(long zoneId, RecordParam txtRecord, CancellationToken cancellationToken = default)
         {
             var response = await _httpClient.PostAsJsonAsync($"managed/{zoneId}/records", txtRecord, cancellationToken);
 
@@ -144,7 +169,7 @@ public class DnsMadeEasyProvider(DnsMadeEasyOptions options) : IDnsProvider
     internal class Domain
     {
         [JsonPropertyName("id")]
-        public required string Id { get; set; }
+        public required long Id { get; set; }
 
         [JsonPropertyName("name")]
         public required string Name { get; set; }
@@ -168,6 +193,6 @@ public class DnsMadeEasyProvider(DnsMadeEasyOptions options) : IDnsProvider
     internal class Record : RecordParam
     {
         [JsonPropertyName("id")]
-        public required string Id { get; set; }
+        public required long Id { get; set; }
     }
 }
