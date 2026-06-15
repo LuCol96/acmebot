@@ -108,6 +108,7 @@ public sealed class AcmeClient : IDisposable
             signedPayload,
             cancellationToken).ConfigureAwait(false);
 
+
         var resource = DeserializeUtf8<AcmeAccountResource>(response.Body);
         var location = response.Location ?? throw new AcmeProtocolException(
             response.StatusCode,
@@ -247,6 +248,7 @@ public sealed class AcmeClient : IDisposable
             account.AccountUrl,
             SerializeUtf8(request),
             cancellationToken).ConfigureAwait(false);
+
 
         return CreateResult(response, DeserializeUtf8<AcmeOrderResource>(response.Body));
     }

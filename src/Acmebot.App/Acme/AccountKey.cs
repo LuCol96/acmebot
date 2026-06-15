@@ -12,12 +12,12 @@ internal class AccountKey
 
     public static AccountKey CreateDefault()
     {
-        using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-
+        using var rsa = RSA.Create(2048);
+    
         return new AccountKey
         {
-            KeyType = "ES256",
-            KeyExport = ecdsa.ExportPkcs8PrivateKeyPem()
+            KeyType = "RS256",
+            KeyExport = rsa.ExportPkcs8PrivateKeyPem()
         };
     }
 

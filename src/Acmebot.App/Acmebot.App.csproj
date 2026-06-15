@@ -34,6 +34,7 @@
     <PackageReference Include="Microsoft.DurableTask.Generators" Version="2.1.0-preview.1" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.16.0" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.15.1" />
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.23.0" />
   </ItemGroup>
 
   <ItemGroup>

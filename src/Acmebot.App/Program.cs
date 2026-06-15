@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 
 using Acmebot.App.Acme;
 using Acmebot.App.Extensions;
@@ -208,6 +208,20 @@ builder.Services.AddSingleton<IEnumerable<IDnsProvider>>(provider =>
     }
 
     return dnsProviders;
+});
+
+builder.Services.AddSingleton(provider =>
+{
+    var connectionString = builder.Configuration["AzureWebJobsStorage"]
+        ?? throw new InvalidOperationException("AzureWebJobsStorage is not configured.");
+    var containerClient = new BlobContainerClient(connectionString, "acmebot");
+    containerClient.CreateIfNotExists();
+    
+    // Debug: explizit testen ob Schreiben funktioniert
+    var testBlob = containerClient.GetBlobClient("_test/write-test.txt");
+    testBlob.Upload(BinaryData.FromString("test"), overwrite: true);
+    
+    return containerClient;
 });
 
 builder.Build().Run();

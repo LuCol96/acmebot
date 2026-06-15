@@ -10,15 +10,18 @@ internal sealed record AcmeProtectedHeader
     public required string Algorithm { get; init; }
 
     [JsonPropertyName("nonce")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Nonce { get; init; }
 
     [JsonPropertyName("url")]
     public required string Url { get; init; }
 
     [JsonPropertyName("jwk")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AcmeJsonWebKey? JsonWebKey { get; init; }
 
     [JsonPropertyName("kid")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? KeyIdentifier { get; init; }
 }
 
@@ -40,18 +43,23 @@ internal sealed record AcmeJsonWebKey
     public required string KeyType { get; init; }
 
     [JsonPropertyName("crv")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Curve { get; init; }
 
     [JsonPropertyName("x")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? X { get; init; }
 
     [JsonPropertyName("y")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Y { get; init; }
 
     [JsonPropertyName("n")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Modulus { get; init; }
 
     [JsonPropertyName("e")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Exponent { get; init; }
 
     public string ToThumbprintJson()

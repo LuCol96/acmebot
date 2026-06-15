@@ -1,22 +1,26 @@
-﻿using Acmebot.Acme;
+using System.Text.Json;
+
+using Acmebot.Acme;
 using Acmebot.Acme.Models;
 using Acmebot.App.Infrastructure;
 using Acmebot.App.Options;
+
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
 
 using Microsoft.Extensions.Options;
 
 namespace Acmebot.App.Acme;
 
-public class AcmeClientFactory(IOptions<AcmebotOptions> options, IAcmeStateStore stateStore)
+public class AcmeClientFactory(IOptions<AcmebotOptions> options, BlobContainerClient blobContainerClient)
 {
     private readonly AcmebotOptions _options = options.Value;
 
     public async Task<AcmeClientContext> CreateClientAsync()
     {
-        var account = await stateStore.LoadAsync<AccountDetails>("account.json");
-        var accountKey = await stateStore.LoadAsync<AccountKey>("account_key.json");
+        var account = await LoadStateAsync<AccountDetails>("account.json");
+        var accountKey = await LoadStateAsync<AccountKey>("account_key.json");
         var contacts = GetContacts();
-        var isNewAccountKey = false;
 
         if (accountKey is null)
         {
@@ -26,7 +30,7 @@ public class AcmeClientFactory(IOptions<AcmebotOptions> options, IAcmeStateStore
             }
 
             accountKey = AccountKey.CreateDefault();
-            isNewAccountKey = true;
+            await SaveStateAsync(accountKey, "account_key.json");
         }
 
         var signer = accountKey.GenerateSigner();
@@ -58,12 +62,8 @@ public class AcmeClientFactory(IOptions<AcmebotOptions> options, IAcmeStateStore
                 externalAccountBinding);
             account = AccountDetails.FromAccountHandle(accountHandle, directory.Metadata?.TermsOfService);
 
-            if (isNewAccountKey)
-            {
-                await stateStore.SaveAsync(accountKey, "account_key.json");
-            }
+            await SaveStateAsync(account, "account.json");
 
-            await stateStore.SaveAsync(account, "account.json");
         }
         else
         {
@@ -80,7 +80,7 @@ public class AcmeClientFactory(IOptions<AcmebotOptions> options, IAcmeStateStore
                 });
             account = AccountDetails.FromAccountHandle(accountHandle, directory.Metadata?.TermsOfService);
 
-            await stateStore.SaveAsync(account, "account.json");
+            await SaveStateAsync(account, "account.json");
         }
 
         return new AcmeClientContext
@@ -109,4 +109,37 @@ public class AcmeClientFactory(IOptions<AcmebotOptions> options, IAcmeStateStore
 
     private static bool ContactsEqual(IReadOnlyList<string>? actualContacts, IReadOnlyList<string> expectedContacts)
         => actualContacts is not null && actualContacts.SequenceEqual(expectedContacts, StringComparer.Ordinal);
+
+    private async Task<TState?> LoadStateAsync<TState>(string path)
+    {
+        var blobName = ResolveBlobName(path);
+        var blobClient = blobContainerClient.GetBlobClient(blobName);
+
+        try
+        {
+            BlobDownloadResult result = await blobClient.DownloadContentAsync();
+            return JsonSerializer.Deserialize<TState>(result.Content.ToString(), s_jsonSerializerOptions);
+        }
+        catch (Azure.RequestFailedException ex) when (ex.Status == 404)
+        {
+            return default;
+        }
+    }
+
+    private async Task SaveStateAsync<TState>(TState value, string path)
+    {
+        var blobName = ResolveBlobName(path);
+        var blobClient = blobContainerClient.GetBlobClient(blobName);
+        var json = JsonSerializer.Serialize(value, s_jsonSerializerOptions);
+        try
+        {
+            await blobClient.UploadAsync(BinaryData.FromString(json), overwrite: true);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to save state to blob '{blobName}': {ex.Message}", ex);
+        }
+    }
+
+    private string ResolveBlobName(string path) => $".acmebot/{_options.Endpoint.Host}/{path}";
 }
