@@ -14,6 +14,12 @@ namespace Acmebot.App.Acme;
 
 public class AcmeClientFactory(IOptions<AcmebotOptions> options, BlobContainerClient blobContainerClient)
 {
+    private static readonly JsonSerializerOptions s_jsonSerializerOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        IncludeFields = true
+    };
+    
     private readonly AcmebotOptions _options = options.Value;
 
     public async Task<AcmeClientContext> CreateClientAsync()
